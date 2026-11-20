@@ -8,6 +8,16 @@ import { Button } from 'primereact/button';
 
 const statuses = ['To Do', 'In Progress', 'Completed'].map(x => ({ label: x, value: x }));
 const priorities = ['Low', 'Medium', 'High'].map(x => ({ label: x, value: x }));
+const startOfDay = date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const toDateOnly = date => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0')
+].join('-');
+const parseDateOnly = value => {
+  const date = new Date(value);
+  return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
 
 export default function TaskDialog({ visible, onHide, onSave, users, task }) {
   const empty = { title: '', description: '', status: 'To Do', priority: 'Medium', dueDate: null, assignee: '' };
@@ -18,7 +28,7 @@ export default function TaskDialog({ visible, onHide, onSave, users, task }) {
     if (!visible) return;
     setForm(task ? {
       title: task.title, description: task.description || '', status: task.status, priority: task.priority,
-      dueDate: task.dueDate ? new Date(task.dueDate) : null, assignee: task.assignee?._id || task.assignee || ''
+      dueDate: task.dueDate ? parseDateOnly(task.dueDate) : null, assignee: task.assignee?._id || task.assignee || ''
     } : empty);
     setError('');
   }, [visible, task]);
@@ -27,10 +37,11 @@ export default function TaskDialog({ visible, onHide, onSave, users, task }) {
     e.preventDefault();
     if (!form.title.trim() || form.title.trim().length < 2) return setError('Enter a title with at least 2 characters.');
     if (!form.dueDate) return setError('Please select a due date.');
+    if (startOfDay(form.dueDate) < startOfDay(new Date())) return setError('Due date cannot be before today.');
     if (!form.assignee) return setError('Please assign this task to a team member.');
     setSaving(true); setError('');
     try {
-      await onSave({ ...form, title: form.title.trim(), dueDate: form.dueDate.toISOString() });
+      await onSave({ ...form, title: form.title.trim(), dueDate: toDateOnly(form.dueDate) });
       onHide();
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
@@ -42,7 +53,7 @@ export default function TaskDialog({ visible, onHide, onSave, users, task }) {
       <div className="form-grid">
         <div><label>Status</label><Dropdown value={form.status} options={statuses} onChange={e => change('status', e.value)} /></div>
         <div><label>Priority</label><Dropdown value={form.priority} options={priorities} onChange={e => change('priority', e.value)} /></div>
-        <div><label>Due date *</label><Calendar value={form.dueDate} onChange={e => change('dueDate', e.value)} dateFormat="dd M yy" showIcon /></div>
+        <div><label>Due date *</label><Calendar value={form.dueDate} onChange={e => change('dueDate', e.value)} minDate={startOfDay(new Date())} dateFormat="dd M yy" showIcon /></div>
         <div><label>Assignee *</label><Dropdown value={form.assignee} options={users.map(u => ({ label: u.name, value: u._id }))} onChange={e => change('assignee', e.value)} placeholder="Select member" /></div>
       </div>
       {error && <div className="form-error">{error}</div>}
